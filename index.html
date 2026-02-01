@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Чат</title>
+    
+    <!-- Подключаем Telegram WebApp SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 100%;
+        }
+        
+        #header {
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            padding: 15px;
+            border-bottom: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            text-align: center;
+            font-weight: 600;
+            font-size: 18px;
+        }
+        
+        #messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .message.user {
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            align-self: flex-end;
+            margin-left: auto;
+        }
+        
+        .message.bot {
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            color: var(--tg-theme-text-color, #000000);
+            align-self: flex-start;
+        }
+        
+        .message.system {
+            background: #fff3cd;
+            color: #856404;
+            align-self: center;
+            font-size: 14px;
+            text-align: center;
+            max-width: 90%;
+        }
+        
+        #input-area {
+            padding: 15px;
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            border-top: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            display: flex;
+            gap: 10px;
+        }
+        
+        #message-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            border-radius: 20px;
+            background: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+            font-size: 16px;
+            outline: none;
+        }
+        
+        #send-btn {
+            background: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+        }
+        
+        #send-btn:active {
+            transform: scale(0.95);
+        }
+        
+        #send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .typing-indicator {
+            display: none;
+            padding: 10px 15px;
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            border-radius: 15px;
+            max-width: 80px;
+            align-self: flex-start;
+        }
+        
+        .typing-indicator.active {
+            display: block;
+        }
+        
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--tg-theme-hint-color, #999);
+            margin-right: 4px;
+            animation: bounce 1.4s infinite;
+        }
+        
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        /* Кнопки быстрых запросов */
+        #quick-buttons {
+            padding: 10px 15px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            background: var(--tg-theme-bg-color, #ffffff);
+        }
+
+        .quick-btn {
+            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            border: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            padding: 8px 15px;
+            border-radius: 15px;
+            cursor: pointer;
+            white-space: nowrap;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .quick-btn:active {
+            background: var(--tg-theme-hint-color, #e0e0e0);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="header">AI Помощник DeepSeek</div>
+        
+        <div id="quick-buttons">
+            <button class="quick-btn" onclick="quickMessage('Расскажи анекдот')">😄 Анекдот</button>
+            <button class="quick-btn" onclick="quickMessage('Дай совет на сегодня')">💡 Совет</button>
+            <button class="quick-btn" onclick="quickMessage('Придумай идею для бизнеса')">💼 Бизнес</button>
+            <button class="quick-btn" onclick="quickMessage('Помоги с кодом')">💻 Код</button>
+        </div>
+        
+        <div id="messages">
+            <div class="message system">
+                👋 Привет! Я AI-ассистент на базе DeepSeek. Задайте мне любой вопрос или используйте быстрые кнопки выше!
+            </div>
+        </div>
+        
+        <div class="typing-indicator" id="typing">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        
+        <div id="input-area">
+            <input 
+                type="text" 
+                id="message-input" 
+                placeholder="Введите сообщение..."
+                autocomplete="off"
+            />
+            <button id="send-btn">➤</button>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // КОНФИГУРАЦИЯ
+        // ========================================
+        
+        // ВАЖНО: ЗАМЕНИТЕ НА ВАШ DeepSeek API KEY!
+        const DEEPSEEK_API_KEY = 'sk-ваш-ключ-deepseek-api';
+        
+        // DeepSeek API настройки
+        const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
+        const MODEL = 'deepseek-chat'; // или 'deepseek-reasoner' для более сложных задач
+        
+        // ========================================
+        // ИНИЦИАЛИЗАЦИЯ TELEGRAM WEBAPP
+        // ========================================
+        
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Разворачиваем приложение на весь экран
+        tg.enableClosingConfirmation(); // Подтверждение при закрытии
+        
+        // Настраиваем цвета под тему Telegram
+        document.body.style.backgroundColor = tg.themeParams.bg_color || '#ffffff';
+        
+        // ========================================
+        // ЭЛЕМЕНТЫ DOM
+        // ========================================
+        
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const typingIndicator = document.getElementById('typing');
+        
+        // ========================================
+        // ИСТОРИЯ РАЗГОВОРА
+        // ========================================
+        
+        let conversationHistory = [
+            {
+                role: 'system',
+                content: 'Ты полезный AI-ассистент. Отвечай кратко, по делу и дружелюбно. Пиши на том языке, на котором к тебе обращаются.'
+            }
+        ];
+        
+        // ========================================
+        // ОСНОВНЫЕ ФУНКЦИИ
+        // ========================================
+        
+        // Отправка сообщения
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+            
+            // Проверяем наличие API ключа
+            if (DEEPSEEK_API_KEY === 'sk-ваш-ключ-deepseek-api') {
+                addMessage('⚠️ Ошибка: Необходимо настроить DeepSeek API ключ в коде!', 'system');
+                return;
+            }
+            
+            // Добавляем сообщение пользователя
+            addMessage(message, 'user');
+            messageInput.value = '';
+            
+            // Отключаем интерфейс во время обработки
+            sendBtn.disabled = true;
+            messageInput.disabled = true;
+            typingIndicator.classList.add('active');
+            
+            try {
+                // Добавляем сообщение в историю
+                conversationHistory.push({
+                    role: 'user',
+                    content: message
+                });
+                
+                // Отправляем запрос к DeepSeek API
+                const response = await fetch(DEEPSEEK_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: MODEL,
+                        messages: conversationHistory,
+                        temperature: 0.7,
+                        max_tokens: 2000,
+                        stream: false
+                    })
+                });
+                
+                // Обработка ошибок HTTP
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Проверяем наличие ответа
+                if (!data.choices || !data.choices[0]) {
+                    throw new Error('Пустой ответ от API');
+                }
+                
+                const botReply = data.choices[0].message.content;
+                
+                // Добавляем ответ в историю
+                conversationHistory.push({
+                    role: 'assistant',
+                    content: botReply
+                });
+                
+                // Показываем ответ
+                addMessage(botReply, 'bot');
+                
+                // Вибрация успеха (если доступно)
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('success');
+                }
+                
+            } catch (error) {
+                console.error('DeepSeek API Error:', error);
+                
+                // Показываем ошибку пользователю
+                let errorMessage = '❌ Ошибка: ';
+                if (error.message.includes('401')) {
+                    errorMessage += 'Неверный API ключ';
+                } else if (error.message.includes('429')) {
+                    errorMessage += 'Превышен лимит запросов';
+                } else if (error.message.includes('insufficient_quota')) {
+                    errorMessage += 'Недостаточно средств на балансе';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                addMessage(errorMessage, 'system');
+                
+                // Вибрация ошибки
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('error');
+                }
+                
+                // Удаляем последнее сообщение из истории при ошибке
+                conversationHistory.pop();
+                
+            } finally {
+                // Включаем интерфейс обратно
+                sendBtn.disabled = false;
+                messageInput.disabled = false;
+                typingIndicator.classList.remove('active');
+                messageInput.focus();
+            }
+        }
+        
+        // Добавление сообщения в чат
+        function addMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            messagesContainer.appendChild(messageDiv);
+            
+            // Автоскролл вниз
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        // Быстрое сообщение из кнопок
+        function quickMessage(text) {
+            messageInput.value = text;
+            sendMessage();
+        }
+        
+        // Очистка истории (можно добавить кнопку)
+        function clearHistory() {
+            conversationHistory = [conversationHistory[0]]; // Оставляем только системный промпт
+            messagesContainer.innerHTML = '<div class="message system">✅ История очищена</div>';
+        }
+        
+        // ========================================
+        // ОБРАБОТЧИКИ СОБЫТИЙ
+        // ========================================
+        
+        sendBtn.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        // Автофокус на поле ввода
+        window.addEventListener('load', () => {
+            messageInput.focus();
+        });
+        
+        // ========================================
+        // ДЕБАГ И ЛОГИ
+        // ========================================
+        
+        console.log('✅ Telegram WebApp инициализирован');
+        console.log('📱 Платформа:', tg.platform);
+        console.log('🎨 Тема:', tg.colorScheme);
+        console.log('👤 Пользователь:', tg.initDataUnsafe?.user);
+        
+        // Показываем пользователю информацию о приложении
+        if (tg.initDataUnsafe?.user) {
+            const userName = tg.initDataUnsafe.user.first_name || 'Пользователь';
+            console.log(`Привет, ${userName}!`);
+        }
+    </script>
+</body>
+</html>
