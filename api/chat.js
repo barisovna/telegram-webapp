@@ -1,41 +1,32 @@
-// ============================================
-// VERCEL API: /api/chat.js
-// ============================================
-// ВАЖНО: Этот файл должен быть в папке /api
-// ============================================
-
+// API endpoint для DeepSeek
 module.exports = async (req, res) => {
-  
-  // CORS заголовки
+  // Разрешаем запросы с любых доменов
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // Обработка preflight запроса (OPTIONS)
+  // Если это проверочный запрос - сразу отвечаем OK
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Разрешаем только POST
+  // Принимаем только POST запросы
   if (req.method !== 'POST') {
     return res.status(405).json({ 
-      error: 'Метод не разрешён. Используйте POST.' 
+      error: 'Используйте POST метод' 
     });
   }
 
   try {
-    console.log('📨 Получен запрос от WebApp');
-
-    // Проверяем наличие API ключа в переменных окружения
+    // Проверяем что API ключ настроен
     if (!process.env.DEEPSEEK_API_KEY) {
-      console.error('❌ API ключ не найден в переменных окружения');
       return res.status(500).json({ 
-        error: 'API ключ не настроен на сервере' 
+        error: 'API ключ не настроен. Добавьте DEEPSEEK_API_KEY в Environment Variables' 
       });
     }
 
-    // Отправляем запрос к DeepSeek API
-    const deepseekResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    // Отправляем запрос к DeepSeek
+    const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -44,27 +35,17 @@ module.exports = async (req, res) => {
       body: JSON.stringify(req.body)
     });
 
-    console.log(`📡 Ответ DeepSeek: ${deepseekResponse.status}`);
+    const data = await response.json();
 
-    // Получаем ответ от DeepSeek
-    const data = await deepseekResponse.json();
-
-    // Если DeepSeek вернул ошибку
-    if (!deepseekResponse.ok) {
-      console.error('❌ Ошибка DeepSeek:', data);
-      return res.status(deepseekResponse.status).json(data);
+    if (!response.ok) {
+      return res.status(response.status).json(data);
     }
 
-    // Возвращаем успешный ответ
-    console.log('✅ Успешный ответ от DeepSeek');
     return res.status(200).json(data);
 
   } catch (error) {
-    console.error('💥 Ошибка обработки:', error.message);
-    
     return res.status(500).json({ 
-      error: error.message,
-      details: 'Произошла ошибка при обработке запроса'
+      error: error.message 
     });
   }
 };
