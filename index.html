@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Чат</title>
-    
-    <!-- Подключаем Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <style>
@@ -19,21 +17,20 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--tg-theme-bg-color, #ffffff);
             color: var(--tg-theme-text-color, #000000);
-            overflow: hidden;
             height: 100vh;
+            overflow: hidden;
         }
         
         #app {
             display: flex;
             flex-direction: column;
             height: 100vh;
-            max-width: 100%;
         }
         
         #header {
             background: var(--tg-theme-secondary-bg-color, #f4f4f5);
             padding: 15px;
-            border-bottom: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            border-bottom: 1px solid #e0e0e0;
             text-align: center;
             font-weight: 600;
             font-size: 18px;
@@ -63,9 +60,8 @@
         
         .message.user {
             background: var(--tg-theme-button-color, #3390ec);
-            color: var(--tg-theme-button-text-color, #ffffff);
+            color: white;
             align-self: flex-end;
-            margin-left: auto;
         }
         
         .message.bot {
@@ -86,7 +82,7 @@
         #input-area {
             padding: 15px;
             background: var(--tg-theme-secondary-bg-color, #f4f4f5);
-            border-top: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            border-top: 1px solid #e0e0e0;
             display: flex;
             gap: 10px;
         }
@@ -94,17 +90,16 @@
         #message-input {
             flex: 1;
             padding: 12px;
-            border: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            border: 1px solid #e0e0e0;
             border-radius: 20px;
-            background: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
+            background: white;
             font-size: 16px;
             outline: none;
         }
         
         #send-btn {
             background: var(--tg-theme-button-color, #3390ec);
-            color: var(--tg-theme-button-text-color, #ffffff);
+            color: white;
             border: none;
             border-radius: 50%;
             width: 45px;
@@ -114,46 +109,39 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: transform 0.2s;
-        }
-        
-        #send-btn:active {
-            transform: scale(0.95);
         }
         
         #send-btn:disabled {
             opacity: 0.5;
-            cursor: not-allowed;
         }
         
-        .typing-indicator {
+        .typing {
             display: none;
             padding: 10px 15px;
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
+            background: #f4f4f5;
             border-radius: 15px;
             max-width: 80px;
-            align-self: flex-start;
         }
         
-        .typing-indicator.active {
+        .typing.active {
             display: block;
         }
         
-        .typing-indicator span {
+        .typing span {
             display: inline-block;
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: var(--tg-theme-hint-color, #999);
+            background: #999;
             margin-right: 4px;
             animation: bounce 1.4s infinite;
         }
         
-        .typing-indicator span:nth-child(2) {
+        .typing span:nth-child(2) {
             animation-delay: 0.2s;
         }
         
-        .typing-indicator span:nth-child(3) {
+        .typing span:nth-child(3) {
             animation-delay: 0.4s;
         }
         
@@ -167,44 +155,36 @@
             display: flex;
             gap: 8px;
             overflow-x: auto;
-            background: var(--tg-theme-bg-color, #ffffff);
         }
 
         .quick-btn {
-            background: var(--tg-theme-secondary-bg-color, #f4f4f5);
-            border: 1px solid var(--tg-theme-hint-color, #e0e0e0);
+            background: #f4f4f5;
+            border: 1px solid #e0e0e0;
             padding: 8px 15px;
             border-radius: 15px;
             cursor: pointer;
             white-space: nowrap;
             font-size: 14px;
-            transition: background 0.2s;
-        }
-
-        .quick-btn:active {
-            background: var(--tg-theme-hint-color, #e0e0e0);
         }
     </style>
 </head>
 <body>
     <div id="app">
-        <div id="header">🔒 AI Помощник (Безопасно)</div>
+        <div id="header">🤖 AI Помощник</div>
         
         <div id="quick-buttons">
             <button class="quick-btn" onclick="quickMessage('Расскажи анекдот')">😄 Анекдот</button>
-            <button class="quick-btn" onclick="quickMessage('Дай совет на сегодня')">💡 Совет</button>
-            <button class="quick-btn" onclick="quickMessage('Придумай идею для бизнеса')">💼 Бизнес</button>
-            <button class="quick-btn" onclick="quickMessage('Помоги с кодом')">💻 Код</button>
+            <button class="quick-btn" onclick="quickMessage('Дай совет')">💡 Совет</button>
+            <button class="quick-btn" onclick="quickMessage('Придумай идею')">💼 Идея</button>
         </div>
         
         <div id="messages">
             <div class="message system">
-                🔒 Это безопасная версия с защищённым API ключом!<br>
-                Задайте мне любой вопрос 👋
+                👋 Привет! Задайте мне любой вопрос
             </div>
         </div>
         
-        <div class="typing-indicator" id="typing">
+        <div class="typing" id="typing">
             <span></span>
             <span></span>
             <span></span>
@@ -215,69 +195,30 @@
                 type="text" 
                 id="message-input" 
                 placeholder="Введите сообщение..."
-                autocomplete="off"
             />
             <button id="send-btn">➤</button>
         </div>
     </div>
 
     <script>
-        // ========================================
-        // КОНФИГУРАЦИЯ (БЕЗОПАСНАЯ!)
-        // ========================================
-        
-        // ✅ API КЛЮЧ БОЛЬШЕ НЕ ХРАНИТСЯ ЗДЕСЬ!
-        // Вместо этого используем защищённый прокси-сервер
-        
-        // ЗАМЕНИТЕ НА URL ВАШЕГО CLOUDFLARE WORKER!
-        //const PROXY_URL = 'https://deepseek-proxy.ваш-username.workers.dev';
-        
-        // Или если используете Vercel:
-        const PROXY_URL = 'telegram-webapp-olive.vercel.app';
-        
-        const MODEL = 'deepseek-chat';
-        
-        // ========================================
-        // ИНИЦИАЛИЗАЦИЯ TELEGRAM WEBAPP
-        // ========================================
-        
+        // Инициализация Telegram
         const tg = window.Telegram.WebApp;
         tg.expand();
-        tg.enableClosingConfirmation();
         
-        // ========================================
-        // ЭЛЕМЕНТЫ DOM
-        // ========================================
+        // !!! ВАЖНО: ЗАМЕНИТЕ НА ВАШ ДОМЕН VERCEL !!!
+        // Формат: https://ваш-проект.vercel.app/api/chat
+        const PROXY_URL = window.location.origin + '/api/chat';
         
         const messagesContainer = document.getElementById('messages');
         const messageInput = document.getElementById('message-input');
         const sendBtn = document.getElementById('send-btn');
         const typingIndicator = document.getElementById('typing');
         
-        // ========================================
-        // ИСТОРИЯ РАЗГОВОРА
-        // ========================================
-        
-        let conversationHistory = [
-            {
-                role: 'system',
-                content: 'Ты полезный AI-ассистент. Отвечай кратко, по делу и дружелюбно. Пиши на том языке, на котором к тебе обращаются.'
-            }
-        ];
-        
-        // ========================================
-        // ОСНОВНЫЕ ФУНКЦИИ
-        // ========================================
+        let conversationHistory = [];
         
         async function sendMessage() {
             const message = messageInput.value.trim();
             if (!message) return;
-            
-            // Проверяем настройку прокси
-            if (PROXY_URL.includes('ваш-username') || PROXY_URL.includes('ваш-проект')) {
-                addMessage('⚠️ Ошибка: Необходимо настроить URL прокси-сервера в коде!', 'system');
-                return;
-            }
             
             addMessage(message, 'user');
             messageInput.value = '';
@@ -292,38 +233,25 @@
                     content: message
                 });
                 
-                // ========================================
-                // БЕЗОПАСНЫЙ ЗАПРОС ЧЕРЕЗ ПРОКСИ
-                // ========================================
-                // API ключ НЕ отправляется с клиента!
-                // Он хранится на сервере (Cloudflare/Vercel)
-                
                 const response = await fetch(PROXY_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
-                        // ✅ Authorization УДАЛЁН - теперь на сервере!
                     },
                     body: JSON.stringify({
-                        model: MODEL,
+                        model: 'deepseek-chat',
                         messages: conversationHistory,
                         temperature: 0.7,
-                        max_tokens: 2000,
-                        stream: false
+                        max_tokens: 2000
                     })
                 });
                 
                 if (!response.ok) {
                     const errorData = await response.json();
-                    throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+                    throw new Error(errorData.error || `Ошибка ${response.status}`);
                 }
                 
                 const data = await response.json();
-                
-                if (!data.choices || !data.choices[0]) {
-                    throw new Error('Пустой ответ от API');
-                }
-                
                 const botReply = data.choices[0].message.content;
                 
                 conversationHistory.push({
@@ -339,26 +267,12 @@
                 
             } catch (error) {
                 console.error('Ошибка:', error);
-                
-                let errorMessage = '❌ Ошибка: ';
-                if (error.message.includes('Failed to fetch')) {
-                    errorMessage += 'Не удалось подключиться к серверу. Проверьте URL прокси.';
-                } else if (error.message.includes('401')) {
-                    errorMessage += 'Неверный API ключ на сервере';
-                } else if (error.message.includes('429')) {
-                    errorMessage += 'Превышен лимит запросов';
-                } else {
-                    errorMessage += error.message;
-                }
-                
-                addMessage(errorMessage, 'system');
+                addMessage('❌ Ошибка: ' + error.message, 'system');
+                conversationHistory.pop();
                 
                 if (tg.HapticFeedback) {
                     tg.HapticFeedback.notificationOccurred('error');
                 }
-                
-                conversationHistory.pop();
-                
             } finally {
                 sendBtn.disabled = false;
                 messageInput.disabled = false;
@@ -380,31 +294,19 @@
             sendMessage();
         }
         
-        // ========================================
-        // ОБРАБОТЧИКИ СОБЫТИЙ
-        // ========================================
-        
         sendBtn.addEventListener('click', sendMessage);
         
         messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter') {
                 e.preventDefault();
                 sendMessage();
             }
         });
         
-        window.addEventListener('load', () => {
-            messageInput.focus();
-        });
+        messageInput.focus();
         
-        // ========================================
-        // ДЕБАГ
-        // ========================================
-        
-        console.log('✅ Безопасная версия WebApp');
-        console.log('🔒 API ключ защищён и не виден в коде');
-        console.log('📡 Прокси URL:', PROXY_URL);
-        console.log('👤 Пользователь:', tg.initDataUnsafe?.user);
+        console.log('✅ Приложение запущено');
+        console.log('🔗 API URL:', PROXY_URL);
     </script>
 </body>
 </html>
