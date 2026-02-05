@@ -1,5 +1,4 @@
-// API endpoint для DeepSeek
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   // Разрешаем запросы с любых доменов
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -25,6 +24,8 @@ module.exports = async (req, res) => {
       });
     }
 
+    const { message, history } = req.body;
+
     // Отправляем запрос к DeepSeek
     const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
@@ -32,7 +33,14 @@ module.exports = async (req, res) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
       },
-      body: JSON.stringify(req.body)
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          ...(history || []),
+          { role: 'user', content: message }
+        ],
+        stream: false
+      })
     });
 
     const data = await response.json();
@@ -48,4 +56,4 @@ module.exports = async (req, res) => {
       error: error.message 
     });
   }
-};
+}
