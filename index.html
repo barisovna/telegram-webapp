@@ -202,132 +202,155 @@
     </div>
 
     <script>
-        // Инициализация Telegram
-        const tg = window.Telegram.WebApp;
-        tg.expand();
+    // Инициализация Telegram
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    tg.ready();
+    
+    // ВАЖНО: замени на свой реальный URL
+    const PROXY_URL = 'https://telegram-webapp-ebon-seven.vercel.app/api/chat';
+    
+    const messagesContainer = document.getElementById('messages');
+    const messageInput = document.getElementById('message-input');
+    const sendBtn = document.getElementById('send-btn');
+    const typingIndicator = document.getElementById('typing');
+    
+    let conversationHistory = [
+        {
+            role: 'system',
+            content: 'Ты полезный AI ассистент. Отвечай на русском языке кратко и по делу.'
+        }
+    ];
+    
+    async function sendMessage() {
+        const message = messageInput.value.trim();
+        if (!message) return;
         
-        // ВАЖНО: замени на свой реальный URL
-        const PROXY_URL = 'https://telegram-webapp-ebon-seven.vercel.app/api/chat';
+        addMessage(message, 'user');
+        messageInput.value = '';
         
-        const messagesContainer = document.getElementById('messages');
-        const messageInput = document.getElementById('message-input');
-        const sendBtn = document.getElementById('send-btn');
-        const typingIndicator = document.getElementById('typing');
+        sendBtn.disabled = true;
+        messageInput.disabled = true;
+        typingIndicator.classList.add('active');
         
-        let conversationHistory = [
-            {
-                role: 'system',
-                content: 'Ты полезный AI ассистент. Отвечай на русском языке кратко и по делу.'
+        try {
+            // Добавляем сообщение пользователя в историю
+            conversationHistory.push({
+                role: 'user',
+                content: message
+            });
+            
+            console.log('📤 Отправляю запрос на:', PROXY_URL);
+            
+            const response = await fetch(PROXY_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    messages: conversationHistory
+                })
+            });
+            
+            console.log('📥 Статус ответа:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Ошибка сервера:', errorText);
+                throw new Error(`Ошибка ${response.status}: ${errorText}`);
             }
-        ];
-        
-        async function sendMessage() {
-            const message = messageInput.value.trim();
-            if (!message) return;
             
-            addMessage(message, 'user');
-            messageInput.value = '';
+            const data = await response.json();
+            console.log('✅ Ответ от API:', data);
             
-            sendBtn.disabled = true;
-            messageInput.disabled = true;
-            typingIndicator.classList.add('active');
+            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                console.error('❌ Некорректная структура ответа:', data);
+                throw new Error('Некорректный ответ от сервера');
+            }
             
-            try {
-                // Добавляем сообщение пользователя в историю
-                conversationHistory.push({
-                    role: 'user',
-                    content: message
-                });
-                
-                console.log('Отправляю запрос на:', PROXY_URL);
-                console.log('История:', conversationHistory);
-                
-                const response = await fetch(PROXY_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        messages: conversationHistory
-                    })
-                });
-                
-                console.log('Статус ответа:', response.status);
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Ошибка сервера:', errorText);
-                    throw new Error(`Ошибка сервера: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                console.log('Ответ от API:', data);
-                
-                if (!data.choices || !data.choices[0]) {
-                    throw new Error('Некорректный ответ от сервера');
-                }
-                
-                const botReply = data.choices[0].message.content;
-                
-                // Добавляем ответ ассистента в историю
-                conversationHistory.push({
-                    role: 'assistant',
-                    content: botReply
-                });
-                
+            const botReply = data.choices[0].message.content;
+            
+            // Добавляем ответ ассистента в историю
+            conversationHistory.push({
+                role: 'assistant',
+                content: botReply
+            });
+            
+            // ВАЖНО: добавляем сообщение с небольшой задержкой
+            setTimeout(() => {
                 addMessage(botReply, 'bot');
-                
-                if (tg.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('success');
-                }
-                
-            } catch (error) {
-                console.error('Ошибка:', error);
-                addMessage('❌ Ошибка: ' + error.message, 'system');
-                
-                // Удаляем последнее сообщение пользователя из истории при ошибке
-                conversationHistory.pop();
-                
-                if (tg.HapticFeedback) {
-                    tg.HapticFeedback.notificationOccurred('error');
-                }
-            } finally {
-                sendBtn.disabled = false;
-                messageInput.disabled = false;
-                typingIndicator.classList.remove('active');
-                messageInput.focus();
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }, 100);
+            
+            // Вибрация успеха
+            if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+                Telegram.WebApp.HapticFeedback.impactOccurred('light');
             }
+            
+        } catch (error) {
+            console.error('❌ Ошибка:', error);
+            
+            // Показываем пользователю понятную ошибку
+            let errorMessage = 'Не удалось получить ответ';
+            if (error.message.includes('Failed to fetch')) {
+                errorMessage = 'Проблема с соединением. Проверьте интернет';
+            } else if (error.message.includes('CORS')) {
+                errorMessage = 'Ошибка безопасности. Попробуйте позже';
+            } else {
+                errorMessage = error.message;
+            }
+            
+            addMessage('❌ ' + errorMessage, 'system');
+            
+            // Удаляем последнее сообщение пользователя из истории при ошибке
+            if (conversationHistory.length > 1) {
+                conversationHistory.pop();
+            }
+            
+            // Вибрация ошибки
+            if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
+                Telegram.WebApp.HapticFeedback.notificationOccurred('error');
+            }
+        } finally {
+            sendBtn.disabled = false;
+            messageInput.disabled = false;
+            typingIndicator.classList.remove('active');
+            setTimeout(() => messageInput.focus(), 50);
         }
-        
-        function addMessage(text, type) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${type}`;
-            messageDiv.textContent = text;
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-        
-        function quickMessage(text) {
-            messageInput.value = text;
+    }
+    
+    function addMessage(text, type) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}`;
+        messageDiv.textContent = text;
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    function quickMessage(text) {
+        messageInput.value = text;
+        sendMessage();
+    }
+    
+    // Обработчики событий
+    sendBtn.addEventListener('click', sendMessage);
+    
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
             sendMessage();
         }
-        
-        // Обработчики событий
-        sendBtn.addEventListener('click', sendMessage);
-        
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-        
-        // Фокус на поле ввода при загрузке
+    });
+    
+    // Автофокус
+    setTimeout(() => {
         messageInput.focus();
-        
-        console.log('✅ Приложение запущено');
-        console.log('🔗 API URL:', PROXY_URL);
-        console.log('📱 Telegram WebApp версия:', tg.version);
-    </script>
+    }, 500);
+    
+    console.log('✅ Приложение запущено в Telegram WebApp');
+    console.log('🔗 API URL:', PROXY_URL);
+    console.log('📱 Telegram версия:', tg.version);
+    console.log('👤 Пользователь:', tg.initDataUnsafe.user);
+</script>
 </body>
 </html>
