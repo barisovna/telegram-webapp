@@ -174,13 +174,13 @@
         
         <div id="quick-buttons">
             <button class="quick-btn" onclick="quickMessage('Расскажи анекдот')">😄 Анекдот</button>
-            <button class="quick-btn" onclick="quickMessage('Дай совет')">💡 Совет</button>
-            <button class="quick-btn" onclick="quickMessage('Придумай идею')">💼 Идея</button>
+            <button class="quick-btn" onclick="quickMessage('Дай совет на сегодня')">💡 Совет</button>
+            <button class="quick-btn" onclick="quickMessage('Придумай бизнес-идею')">💼 Идея</button>
         </div>
         
         <div id="messages">
             <div class="message system">
-                👋 Привет! Задайте мне любой вопрос
+                👋 Привет! Я твой AI помощник. Задай мне любой вопрос!
             </div>
         </div>
         
@@ -195,6 +195,7 @@
                 type="text" 
                 id="message-input" 
                 placeholder="Введите сообщение..."
+                autocomplete="off"
             />
             <button id="send-btn">➤</button>
         </div>
@@ -205,8 +206,7 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
         
-        // !!! ВАЖНО: ЗАМЕНИТЕ НА ВАШ ДОМЕН VERCEL !!!
-        // Формат: https://ваш-проект.vercel.app/api/chat
+        // ВАЖНО: замени на свой реальный URL
         const PROXY_URL = 'https://telegram-webapp-pwpiu6o1p-allayudaevas-projects.vercel.app/api/chat';
         
         const messagesContainer = document.getElementById('messages');
@@ -214,7 +214,12 @@
         const sendBtn = document.getElementById('send-btn');
         const typingIndicator = document.getElementById('typing');
         
-        let conversationHistory = [];
+        let conversationHistory = [
+            {
+                role: 'system',
+                content: 'Ты полезный AI ассистент. Отвечай на русском языке кратко и по делу.'
+            }
+        ];
         
         async function sendMessage() {
             const message = messageInput.value.trim();
@@ -228,10 +233,14 @@
             typingIndicator.classList.add('active');
             
             try {
+                // Добавляем сообщение пользователя в историю
                 conversationHistory.push({
                     role: 'user',
                     content: message
                 });
+                
+                console.log('Отправляю запрос на:', PROXY_URL);
+                console.log('История:', conversationHistory);
                 
                 const response = await fetch(PROXY_URL, {
                     method: 'POST',
@@ -239,21 +248,28 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        model: 'deepseek-chat',
-                        messages: conversationHistory,
-                        temperature: 0.7,
-                        max_tokens: 2000
+                        messages: conversationHistory
                     })
                 });
                 
+                console.log('Статус ответа:', response.status);
+                
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `Ошибка ${response.status}`);
+                    const errorText = await response.text();
+                    console.error('Ошибка сервера:', errorText);
+                    throw new Error(`Ошибка сервера: ${response.status}`);
                 }
                 
                 const data = await response.json();
+                console.log('Ответ от API:', data);
+                
+                if (!data.choices || !data.choices[0]) {
+                    throw new Error('Некорректный ответ от сервера');
+                }
+                
                 const botReply = data.choices[0].message.content;
                 
+                // Добавляем ответ ассистента в историю
                 conversationHistory.push({
                     role: 'assistant',
                     content: botReply
@@ -268,6 +284,8 @@
             } catch (error) {
                 console.error('Ошибка:', error);
                 addMessage('❌ Ошибка: ' + error.message, 'system');
+                
+                // Удаляем последнее сообщение пользователя из истории при ошибке
                 conversationHistory.pop();
                 
                 if (tg.HapticFeedback) {
@@ -294,6 +312,7 @@
             sendMessage();
         }
         
+        // Обработчики событий
         sendBtn.addEventListener('click', sendMessage);
         
         messageInput.addEventListener('keypress', (e) => {
@@ -303,10 +322,12 @@
             }
         });
         
+        // Фокус на поле ввода при загрузке
         messageInput.focus();
         
         console.log('✅ Приложение запущено');
         console.log('🔗 API URL:', PROXY_URL);
+        console.log('📱 Telegram WebApp версия:', tg.version);
     </script>
 </body>
 </html>
