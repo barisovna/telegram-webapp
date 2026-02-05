@@ -24,7 +24,9 @@ export default async function handler(req, res) {
       });
     }
 
-    const { message, history } = req.body;
+    const { messages } = req.body;
+    const message = messages[messages.length - 1].content;
+    const history = messages.slice(0, -1);
 
     // Отправляем запрос к DeepSeek
     const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
