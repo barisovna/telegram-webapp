@@ -174,8 +174,8 @@
         
         <div id="quick-buttons">
             <button class="quick-btn" onclick="quickMessage('Расскажи анекдот')">😄 Анекдот</button>
-            <button class="quick-btn" onclick="quickMessage('Дай совет на сегодня')">💡 Совет</button>
-            <button class="quick-btn" onclick="quickMessage('Придумай бизнес-идею')">💼 Идея</button>
+            <button class="quick-btn" onclick="quickMessage('Дай совет')">💡 Совет</button>
+            <button class="quick-btn" onclick="quickMessage('Придумай идею')">💼 Идея</button>
         </div>
         
         <div id="messages">
@@ -202,155 +202,149 @@
     </div>
 
     <script>
-    // Инициализация Telegram
-    const tg = window.Telegram.WebApp;
-    tg.expand();
-    tg.ready();
-    
-    // ВАЖНО: замени на свой реальный URL
-    const PROXY_URL = 'https://telegram-webapp-ebon-seven.vercel.app/api/chat';
-    
-    const messagesContainer = document.getElementById('messages');
-    const messageInput = document.getElementById('message-input');
-    const sendBtn = document.getElementById('send-btn');
-    const typingIndicator = document.getElementById('typing');
-    
-    let conversationHistory = [
-        {
-            role: 'system',
-            content: 'Ты полезный AI ассистент. Отвечай на русском языке кратко и по делу.'
-        }
-    ];
-    
-    async function sendMessage() {
-        const message = messageInput.value.trim();
-        if (!message) return;
+        // Инициализация Telegram
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
         
-        addMessage(message, 'user');
-        messageInput.value = '';
+        // API URL - автоматически берёт текущий домен
+        const PROXY_URL = window.location.origin + '/api/chat';
         
-        sendBtn.disabled = true;
-        messageInput.disabled = true;
-        typingIndicator.classList.add('active');
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendBtn = document.getElementById('send-btn');
+        const typingIndicator = document.getElementById('typing');
         
-        try {
-            // Добавляем сообщение пользователя в историю
-            conversationHistory.push({
-                role: 'user',
-                content: message
-            });
+        let conversationHistory = [];
+        
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
             
-            console.log('📤 Отправляю запрос на:', PROXY_URL);
+            addMessage(message, 'user');
+            messageInput.value = '';
             
-            const response = await fetch(PROXY_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    messages: conversationHistory
-                })
-            });
+            sendBtn.disabled = true;
+            messageInput.disabled = true;
+            typingIndicator.classList.add('active');
             
-            console.log('📥 Статус ответа:', response.status);
-            
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Ошибка сервера:', errorText);
-                throw new Error(`Ошибка ${response.status}: ${errorText}`);
-            }
-            
-            const data = await response.json();
-            console.log('✅ Ответ от API:', data);
-            
-            if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-                console.error('❌ Некорректная структура ответа:', data);
-                throw new Error('Некорректный ответ от сервера');
-            }
-            
-            const botReply = data.choices[0].message.content;
-            
-            // Добавляем ответ ассистента в историю
-            conversationHistory.push({
-                role: 'assistant',
-                content: botReply
-            });
-            
-            // ВАЖНО: добавляем сообщение с небольшой задержкой
-            setTimeout(() => {
+            try {
+                // Добавляем сообщение в историю
+                conversationHistory.push({
+                    role: 'user',
+                    content: message
+                });
+                
+                console.log('📤 Отправляю на:', PROXY_URL);
+                console.log('📝 История:', conversationHistory);
+                
+                // ИСПРАВЛЕНО: Отправляем правильную структуру!
+                const response = await fetch(PROXY_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        messages: conversationHistory  // Отправляем массив сообщений
+                    }),
+                    mode: 'cors',  // Важно для CORS
+                    credentials: 'omit'  // Не отправляем куки
+                });
+                
+                console.log('📥 Статус:', response.status);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('❌ Ошибка:', errorText);
+                    throw new Error(`Ошибка ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('✅ Получен ответ:', data);
+                
+                // Проверяем структуру ответа
+                if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+                    console.error('❌ Некорректная структура:', data);
+                    throw new Error('Некорректный ответ от сервера');
+                }
+                
+                const botReply = data.choices[0].message.content;
+                
+                // Добавляем ответ в историю
+                conversationHistory.push({
+                    role: 'assistant',
+                    content: botReply
+                });
+                
                 addMessage(botReply, 'bot');
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            }, 100);
-            
-            // Вибрация успеха
-            if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
-                Telegram.WebApp.HapticFeedback.impactOccurred('light');
-            }
-            
-        } catch (error) {
-            console.error('❌ Ошибка:', error);
-            
-            // Показываем пользователю понятную ошибку
-            let errorMessage = 'Не удалось получить ответ';
-            if (error.message.includes('Failed to fetch')) {
-                errorMessage = 'Проблема с соединением. Проверьте интернет';
-            } else if (error.message.includes('CORS')) {
-                errorMessage = 'Ошибка безопасности. Попробуйте позже';
-            } else {
-                errorMessage = error.message;
-            }
-            
-            addMessage('❌ ' + errorMessage, 'system');
-            
-            // Удаляем последнее сообщение пользователя из истории при ошибке
-            if (conversationHistory.length > 1) {
+                
+                // Вибрация успеха
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.impactOccurred('light');
+                }
+                
+            } catch (error) {
+                console.error('❌ Ошибка:', error);
+                
+                let errorMessage = '❌ Ошибка: ';
+                
+                if (error.message.includes('Failed to fetch')) {
+                    errorMessage += 'Проблема с соединением';
+                } else if (error.message.includes('NetworkError')) {
+                    errorMessage += 'Нет интернета';
+                } else if (error.message.includes('500')) {
+                    errorMessage += 'Ошибка сервера';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                addMessage(errorMessage, 'system');
+                
+                // Удаляем последнее сообщение из истории при ошибке
                 conversationHistory.pop();
+                
+                if (tg.HapticFeedback) {
+                    tg.HapticFeedback.notificationOccurred('error');
+                }
+                
+            } finally {
+                sendBtn.disabled = false;
+                messageInput.disabled = false;
+                typingIndicator.classList.remove('active');
+                messageInput.focus();
             }
-            
-            // Вибрация ошибки
-            if (window.Telegram && Telegram.WebApp && Telegram.WebApp.HapticFeedback) {
-                Telegram.WebApp.HapticFeedback.notificationOccurred('error');
-            }
-        } finally {
-            sendBtn.disabled = false;
-            messageInput.disabled = false;
-            typingIndicator.classList.remove('active');
-            setTimeout(() => messageInput.focus(), 50);
         }
-    }
-    
-    function addMessage(text, type) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${type}`;
-        messageDiv.textContent = text;
-        messagesContainer.appendChild(messageDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-    
-    function quickMessage(text) {
-        messageInput.value = text;
-        sendMessage();
-    }
-    
-    // Обработчики событий
-    sendBtn.addEventListener('click', sendMessage);
-    
-    messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
+        
+        function addMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.textContent = text;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        function quickMessage(text) {
+            messageInput.value = text;
             sendMessage();
         }
-    });
-    
-    // Автофокус
-    setTimeout(() => {
-        messageInput.focus();
-    }, 500);
-    
-    console.log('✅ Приложение запущено в Telegram WebApp');
-    console.log('🔗 API URL:', PROXY_URL);
-    console.log('📱 Telegram версия:', tg.version);
-    console.log('👤 Пользователь:', tg.initDataUnsafe.user);
-</script>
+        
+        // Обработчики
+        sendBtn.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+        
+        // Автофокус
+        setTimeout(() => messageInput.focus(), 300);
+        
+        console.log('✅ Приложение запущено');
+        console.log('🔗 API URL:', PROXY_URL);
+        console.log('📱 Telegram версия:', tg.version);
+    </script>
 </body>
 </html>
