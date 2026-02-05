@@ -2,8 +2,9 @@ export default async function handler(req, res) {
   // ВАЖНО: CORS заголовки должны быть ПЕРВЫМИ
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Max-Age', '86400'); // 24 часа
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+  res.setHeader('Access-Control-Allow-Credentials', 'false');
+  res.setHeader('Access-Control-Max-Age', '3600');
 
   // Обработка предварительного запроса OPTIONS
   if (req.method === 'OPTIONS') {
