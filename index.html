@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Чат с Qwen Voice</title>
+    <title>AI Чат с голосом</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     
     <style>
@@ -195,7 +195,7 @@
 </head>
 <body>
     <div id="app">
-        <div id="header">🎤 AI + Qwen Voice</div>
+        <div id="header">🎤 AI Помощник с голосом</div>
         
         <div id="quick-buttons">
             <button class="quick-btn" onclick="quickMessage('Расскажи анекдот')">😄 Анекдот</button>
@@ -204,13 +204,13 @@
         </div>
         
         <div id="recording-indicator">
-            🔴 Запись... Говорите!
+            🔴 Слушаю... Говорите!
         </div>
         
         <div id="messages">
             <div class="message system">
-                🎤 Нажми на микрофон и говори на русском языке!<br>
-                Qwen ASR распознает вашу речь.
+                🎤 Нажми на микрофон и говори на русском!<br>
+                Или пиши текстом 👇
             </div>
         </div>
         
@@ -221,7 +221,7 @@
         </div>
         
         <div id="input-area">
-            <button id="voice-btn" class="btn" title="Голосовой ввод через Qwen">
+            <button id="voice-btn" class="btn" title="Голосовой ввод">
                 🎤
             </button>
             <input 
@@ -245,8 +245,7 @@
         tg.expand();
         tg.ready();
         
-        const CHAT_API_URL = window.location.origin + '/api/chat';
-        const SPEECH_API_URL = window.location.origin + '/api/speech-to-text';
+        const PROXY_URL = window.location.origin + '/api/chat';
         
         const messagesContainer = document.getElementById('messages');
         const messageInput = document.getElementById('message-input');
@@ -256,151 +255,119 @@
         const recordingIndicator = document.getElementById('recording-indicator');
         
         let conversationHistory = [];
-        let mediaRecorder = null;
-        let audioChunks = [];
         let isRecording = false;
+        let recognition = null;
         
         // ========================================
-        // ГОЛОСОВОЙ ВВОД ЧЕРЕЗ QWEN ASR
+        // ГОЛОСОВОЙ ВВОД (Web Speech API - БЕСПЛАТНО)
         // ========================================
         
-        // Проверяем поддержку записи
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            console.warn('⚠️ Запись звука не поддерживается');
-            voiceBtn.style.display = 'none';
-            addMessage('❌ Запись звука не поддерживается в этом браузере', 'system');
-        }
+        // Проверяем поддержку
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         
-        // Начать/остановить запись
-        voiceBtn.addEventListener('click', async function() {
-            if (isRecording) {
-                stopRecording();
-            } else {
-                await startRecording();
-            }
-        });
-        
-        async function startRecording() {
-            try {
-                console.log('🎤 Запрашиваю доступ к микрофону...');
-                
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: {
-                        sampleRate: 16000,  // Qwen предпочитает 16kHz
-                        channelCount: 1,     // Моно
-                        echoCancellation: true,
-                        noiseSuppression: true
-                    } 
-                });
-                
-                audioChunks = [];
-                mediaRecorder = new MediaRecorder(stream, {
-                    mimeType: 'audio/webm;codecs=opus'
-                });
-                
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                    }
-                };
-                
-                mediaRecorder.onstop = async () => {
-                    console.log('🔴 Запись остановлена');
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    await processAudio(audioBlob);
-                    
-                    // Останавливаем поток
-                    stream.getTracks().forEach(track => track.stop());
-                };
-                
-                mediaRecorder.start();
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            
+            // Настройки распознавания
+            recognition.lang = 'ru-RU';  // Русский язык
+            recognition.continuous = false;  // Остановка после фразы
+            recognition.interimResults = false;  // Только финальные результаты
+            recognition.maxAlternatives = 1;
+            
+            // Когда начинается запись
+            recognition.onstart = function() {
                 isRecording = true;
                 voiceBtn.classList.add('recording');
                 recordingIndicator.classList.add('active');
-                
-                console.log('✅ Запись началась');
+                console.log('🎤 Запись началась');
                 
                 if (tg.HapticFeedback) {
                     tg.HapticFeedback.impactOccurred('medium');
                 }
+            };
+            
+            // Когда получен результат
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                const confidence = event.results[0][0].confidence;
                 
-            } catch (error) {
-                console.error('❌ Ошибка доступа к микрофону:', error);
-                addMessage('❌ Не удалось получить доступ к микрофону', 'system');
-            }
-        }
-        
-        function stopRecording() {
-            if (mediaRecorder && isRecording) {
-                mediaRecorder.stop();
+                console.log('✅ Распознано:', transcript);
+                console.log('🎯 Уверенность:', (confidence * 100).toFixed(1) + '%');
+                
+                messageInput.value = transcript;
+                
+                // Автоматически отправляем
+                setTimeout(() => {
+                    sendMessage();
+                }, 300);
+            };
+            
+            // Когда запись закончилась
+            recognition.onend = function() {
                 isRecording = false;
                 voiceBtn.classList.remove('recording');
                 recordingIndicator.classList.remove('active');
-            }
-        }
-        
-        async function processAudio(audioBlob) {
-            console.log('📤 Отправляю аудио в Qwen ASR...');
+                console.log('🔴 Запись закончена');
+            };
             
-            addMessage('🎤 Распознаю речь...', 'system');
-            voiceBtn.disabled = true;
-            sendBtn.disabled = true;
-            
-            try {
-                // Конвертируем в base64
-                const reader = new FileReader();
-                reader.readAsDataURL(audioBlob);
+            // Обработка ошибок
+            recognition.onerror = function(event) {
+                console.error('❌ Ошибка распознавания:', event.error);
+                isRecording = false;
+                voiceBtn.classList.remove('recording');
+                recordingIndicator.classList.remove('active');
                 
-                reader.onloadend = async () => {
-                    const base64Audio = reader.result.split(',')[1];  // Убираем префикс data:audio/webm;base64,
-                    
-                    console.log('📡 Отправляю на сервер...');
-                    
-                    const response = await fetch(SPEECH_API_URL, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            audio: base64Audio
-                        })
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error(`Ошибка ${response.status}`);
-                    }
-                    
-                    const data = await response.json();
-                    console.log('✅ Распознано:', data.text);
-                    
-                    // Удаляем сообщение "Распознаю..."
-                    const systemMessages = messagesContainer.querySelectorAll('.message.system');
-                    const lastSystem = systemMessages[systemMessages.length - 1];
-                    if (lastSystem && lastSystem.textContent.includes('Распознаю')) {
-                        lastSystem.remove();
-                    }
-                    
-                    // Вставляем текст и отправляем
-                    messageInput.value = data.text;
-                    sendMessage();
-                    
-                    if (tg.HapticFeedback) {
-                        tg.HapticFeedback.notificationOccurred('success');
-                    }
-                };
+                let errorMsg = '';
+                switch(event.error) {
+                    case 'no-speech':
+                        errorMsg = '🔇 Ничего не услышал. Попробуйте ещё раз.';
+                        break;
+                    case 'audio-capture':
+                        errorMsg = '❌ Микрофон недоступен';
+                        break;
+                    case 'not-allowed':
+                        errorMsg = '❌ Разрешите доступ к микрофону в настройках';
+                        break;
+                    case 'network':
+                        errorMsg = '❌ Проблема с интернетом';
+                        break;
+                    default:
+                        errorMsg = '❌ Ошибка: ' + event.error;
+                }
                 
-            } catch (error) {
-                console.error('❌ Ошибка распознавания:', error);
-                addMessage('❌ Не удалось распознать речь: ' + error.message, 'system');
+                addMessage(errorMsg, 'system');
                 
                 if (tg.HapticFeedback) {
                     tg.HapticFeedback.notificationOccurred('error');
                 }
-            } finally {
-                voiceBtn.disabled = false;
-                sendBtn.disabled = false;
-            }
+            };
+            
+        } else {
+            console.warn('⚠️ Голосовой ввод не поддерживается');
+            voiceBtn.style.display = 'none';
+            addMessage('❌ Голосовой ввод не поддерживается в этом браузере', 'system');
         }
+        
+        // Обработчик кнопки микрофона
+        voiceBtn.addEventListener('click', function() {
+            if (!recognition) {
+                addMessage('❌ Голосовой ввод не поддерживается', 'system');
+                return;
+            }
+            
+            if (isRecording) {
+                // Останавливаем запись
+                recognition.stop();
+            } else {
+                // Начинаем запись
+                try {
+                    recognition.start();
+                } catch (e) {
+                    console.error('Ошибка запуска:', e);
+                    addMessage('❌ Ошибка запуска записи. Попробуйте ещё раз.', 'system');
+                }
+            }
+        });
         
         // ========================================
         // ОТПРАВКА СООБЩЕНИЯ
@@ -424,7 +391,7 @@
                     content: message
                 });
                 
-                const response = await fetch(CHAT_API_URL, {
+                const response = await fetch(PROXY_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -505,9 +472,9 @@
         
         setTimeout(() => messageInput.focus(), 300);
         
-        console.log('✅ Приложение с Qwen Voice запущено');
-        console.log('🔗 Chat API:', CHAT_API_URL);
-        console.log('🎤 Speech API:', SPEECH_API_URL);
+        console.log('✅ Приложение с голосовым вводом запущено');
+        console.log('🎤 Голосовой ввод:', recognition ? 'Работает' : 'Не поддерживается');
+        console.log('🔗 API URL:', PROXY_URL);
     </script>
 </body>
 </html>
